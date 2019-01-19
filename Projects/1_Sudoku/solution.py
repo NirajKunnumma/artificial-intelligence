@@ -1,15 +1,14 @@
 
 from utils import *
-
+import copy
 
 row_units = [cross(r, cols) for r in rows]
 column_units = [cross(rows, c) for c in cols]
 square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
-unitlist = row_units + column_units + square_units
-
-# TODO: Update the unit list to add the new diagonal units
-unitlist = unitlist
-
+d1 = [(r + c) for r, c in zip(rows, cols)]
+d2 = [(r + c) for r, c in zip(rows, cols[::-1])]
+diagonal_units = [d1, d2]
+unitlist = row_units + column_units + square_units + diagonal_units
 
 # Must be called after all units (including diagonals) are added to the unitlist
 units = extract_units(unitlist, boxes)
@@ -54,8 +53,15 @@ def naked_twins(values):
     https://github.com/udacity/artificial-intelligence/blob/master/Projects/1_Sudoku/pseudocode.md
     """
     # TODO: Implement this function!
-    raise NotImplementedError
-
+    original_values = copy.copy(values)
+    for box in values:
+        for peer in peers[box]:
+            if len(values[box]) == 2 and len(values[peer]) == 2 and set(values[box]) == set(values[peer]):
+                edit_peers = peers[box].intersection(peers[peer])
+                for edit_peer in edit_peers:
+                    original_values[edit_peer] = original_values[edit_peer].replace(values[box][0], "")
+                    original_values[edit_peer] = original_values[edit_peer].replace(values[box][1], "")
+    return original_values
 
 def eliminate(values):
     """Apply the eliminate strategy to a Sudoku puzzle
@@ -74,7 +80,13 @@ def eliminate(values):
         The values dictionary with the assigned values eliminated from peers
     """
     # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    input_keys = [key for key in boxes if len(values[key]) == 1]
+    
+    for key in input_keys:
+        peer_key_list = peers[key]
+        for peer_key in peer_key_list:
+            values[peer_key] = values[peer_key].replace(values[key], '')
+    return values
 
 
 def only_choice(values):
@@ -98,7 +110,12 @@ def only_choice(values):
     You should be able to complete this function by copying your code from the classroom
     """
     # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    for unit in unitlist:
+        for digit in '123456789':
+            dplaces = [box for box in unit if digit in values[box]]
+            if len(dplaces) == 1:
+                values[dplaces[0]] = digit
+    return values
 
 
 def reduce_puzzle(values):
@@ -116,7 +133,18 @@ def reduce_puzzle(values):
         no longer produces any changes, or False if the puzzle is unsolvable 
     """
     # TODO: Copy your code from the classroom and modify it to complete this function
-    raise NotImplementedError
+    solved_values = [box for box in values.keys() if len(values[box]) == 1]
+    stalled = False
+    while not stalled:
+        solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
+        values = eliminate(values)
+        values = only_choice(values)
+        vlaues = naked_twins(values)
+        solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
+        stalled = solved_values_before == solved_values_after
+        if len([box for box in values.keys() if len(values[box]) == 0]):
+            return False
+    return values
 
 
 def search(values):
@@ -139,7 +167,33 @@ def search(values):
     and extending it to call the naked twins strategy.
     """
     # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    values = reduce_puzzle(values)
+    
+    if not values:
+        return
+
+    len_solved_values = len([box for box in values.keys() if len(values[box]) == 1])
+    
+    if len_solved_values == 81:
+        return values
+    
+    sorted_by_value = sorted(values.items(), key=lambda kv: len(kv[1]))
+    
+    split_key = ''
+    for key in sorted_by_value:
+        if len(key[1]) > 1:
+            split_key = key
+            break
+        
+    for digit in split_key[1]:
+        temp_values = copy.copy(values)
+        
+        temp_values[split_key[0]] = digit
+        
+        temp_values = search(temp_values)
+        
+        if temp_values:
+            return temp_values
 
 
 def solve(grid):
@@ -163,6 +217,7 @@ def solve(grid):
 
 
 if __name__ == "__main__":
+   
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
     display(grid2values(diag_sudoku_grid))
     result = solve(diag_sudoku_grid)
